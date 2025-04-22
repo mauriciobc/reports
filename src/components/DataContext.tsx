@@ -1,11 +1,9 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { ChartData } from '../utils/csvHandler';
+import { ChartDataResponse } from '../utils/csvHandler';
 
 interface DataContextType {
-  radarData: ChartData[];
-  barData: ChartData[];
-  pieData: ChartData[];
-  setChartData: (data: { radar: ChartData[]; bar: ChartData[]; pie: ChartData[] }) => void;
+  chartData: ChartDataResponse | null;
+  setChartData: (data: ChartDataResponse) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   error: string | null;
@@ -14,39 +12,45 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-export function DataProvider({ children }: { children: ReactNode }) {
-  const [radarData, setRadarData] = useState<ChartData[]>([]);
-  const [barData, setBarData] = useState<ChartData[]>([]);
-  const [pieData, setPieData] = useState<ChartData[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const setChartData = (data: { radar: ChartData[]; bar: ChartData[]; pie: ChartData[] }) => {
-    setRadarData(data.radar);
-    setBarData(data.bar);
-    setPieData(data.pie);
-  };
-
-  return (
-    <DataContext.Provider value={{
-      radarData,
-      barData,
-      pieData,
-      setChartData,
-      isLoading,
-      setIsLoading,
-      error,
-      setError
-    }}>
-      {children}
-    </DataContext.Provider>
-  );
-}
-
-export function useData() {
+export const useData = () => {
   const context = useContext(DataContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useData must be used within a DataProvider');
   }
   return context;
+};
+
+interface DataProviderProps {
+  children: ReactNode;
 }
+
+export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
+  const [chartData, setChartData] = useState<ChartDataResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const value = {
+    chartData,
+    setChartData,
+    isLoading,
+    setIsLoading,
+    error,
+    setError,
+  };
+
+  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+};
+
+// Wrapper component that combines the provider with the file list and visualization
+export const DataContextWrapper: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const handleDataProcessed = (data: ChartDataResponse) => {
+    // You can add any data processing or validation here
+    console.log('Data processed:', data);
+  };
+
+  return (
+    <DataProvider>
+      {children}
+    </DataProvider>
+  );
+};
