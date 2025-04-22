@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { logger } from './logger';
 
 export interface RadarData {
   subject: string;
@@ -31,18 +32,18 @@ const evaluationScores: { [key: string]: number } = {
   'Precisa melhorar': 1,
   
   // Atende expectativas variations
-  '🆗 Como esperado. Atende às expectativas.': 3,
-  'Como esperado. Atende às expectativas.': 3,
-  'Atende às expectativas': 3,
-  'Como esperado': 3,
-  'Atende expectativas': 3,
+  '🆗 Como esperado. Atende às expectativas.': 2,
+  'Como esperado. Atende às expectativas.': 2,
+  'Atende às expectativas': 2,
+  'Como esperado': 2,
+  'Atende expectativas': 2,
   
   // Supera expectativas variations
-  '🎉 Parabéns! Supera as expectativas.': 5,
-  'Parabéns! Supera as expectativas.': 5,
-  'Supera as expectativas': 5,
-  'Supera expectativas': 5,
-  'Parabéns': 5,
+  '🎉 Parabéns! Supera as expectativas.': 3,
+  'Parabéns! Supera as expectativas.': 3,
+  'Supera as expectativas': 3,
+  'Supera expectativas': 3,
+  'Parabéns': 3,
   
   // Not applicable variations
   'Não se aplica': 0,
@@ -91,79 +92,176 @@ const normalizeEvaluationValue = (value: string): string => {
 };
 
 const processRadarData = (data: any[]): RadarData[] => {
-  const teamMembers = ['Viviane', 'Matheus', 'Lidineu', 'Rafael Victor', 'Paulo Henrique', 'Yasmin'];
   const competencies = [
-    { name: 'Cooperação', pattern: 'cooperação' },
-    { name: 'Comunicação', pattern: 'comunicação' },
-    { name: 'Comprometimento', pattern: 'compromisso' },
-    { name: 'Domínio Técnico', pattern: 'domínio técnico' },
-    { name: 'Resolução Problemas', pattern: 'problemas' }
+    { name: 'Cooperação', pattern: ['cooperação', 'coopera', 'ajuda mútua'] },
+    { name: 'Comunicação', pattern: ['comunicação', 'comunica'] },
+    { name: 'Comprometimento', pattern: ['compromisso', 'comprometimento'] },
+    { name: 'Domínio Técnico', pattern: ['domínio técnico', 'conhecimento técnico'] },
+    { name: 'Resolução Problemas', pattern: ['problemas', 'resolução', 'solução'] }
   ];
 
-  // Log the raw data structure
-  console.log('Raw CSV Data Structure:', data);
-  console.log('First row example:', data[0]);
-  console.log('Available columns:', data[0] ? Object.keys(data[0]) : []);
+  logger.log('Starting radar data processing', {
+    dataRows: data.length,
+    competencies: competencies.map(c => ({ name: c.name, patterns: c.pattern }))
+  });
 
+  // Helper function to clean member name
+  const cleanMemberName = (name: string): string => {
+    return name.replace(/_1$/, '').trim();
+  };
+
+  // Helper function to check if a question matches a competency
+  const matchesCompetency = (questionText: string, patterns: string[]): boolean => {
+    const normalizedQuestion = questionText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return patterns.some(pattern => {
+      const normalizedPattern = pattern.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return normalizedQuestion.includes(normalizedPattern);
+    });
+  };
+
+  // Helper function to extract member name from a column header
+  const extractMemberName = (header: string): string | null => {
+    if (!header.includes('>>')) return null;
+    
+    const parts = header.split('>>').map(part => part.trim());
+    if (parts.length < 2) return null;
+
+    const memberName = cleanMemberName(parts[1]);
+    if (!memberName || 
+        ['Data', 'Submission Date'].includes(memberName) || 
+        memberName.length === 0) {
+      return null;
+    }
+
+    return memberName;
+  };
+
+  // Helper function to extract answer from column
+  const extractAnswer = (key: string, value: any): string | null => {
+    const parts = key.split('>>').map(part => part.trim());
+    
+    // First check if we have a value in the cell
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+    
+    // If we have a third part in the header (Question >> User >> Answer)
+    // AND the value is true/1/'1'/etc, then use the answer from the header
+    if (parts.length >= 3 && parts[2].trim()) {
+      const lastPart = parts[2].trim();
+      if (value === true || value === 1 || value === '1' || 
+          (typeof value === 'string' && value.toLowerCase() === 'true')) {
+        return lastPart;
+      }
+    }
+
+    return null;
+  };
+
+  // First, extract all unique member names from the column headers
+  const teamMembers = new Set<string>();
+  if (data.length > 0) {
+    Object.keys(data[0]).forEach(header => {
+      const memberName = extractMemberName(header);
+      if (memberName) {
+        teamMembers.add(memberName);
+        logger.log('Found team member', { 
+          memberName, 
+          originalHeader: header 
+        });
+      }
+    });
+  }
+
+  const teamMembersArray = Array.from(teamMembers);
+  logger.log('Extracted team members', {
+    count: teamMembersArray.length,
+    members: teamMembersArray
+  });
+
+  // Process data for each competency
   return competencies.map(competency => {
     const row: RadarData = { subject: competency.name };
     
-    teamMembers.forEach(member => {
+    teamMembersArray.forEach(member => {
       let totalScore = 0;
       let count = 0;
-      let matchingKeys: string[] = [];
+      let matchedQuestions: string[] = [];
+      let answers: { question: string, answer: string, score: number }[] = [];
 
       // Process each row of data
       data.forEach((dataRow, rowIndex) => {
         // Find all columns for this member and competency
         Object.entries(dataRow).forEach(([key, value]) => {
-          // Make the pattern matching case-insensitive and more flexible
-          const keyLower = key.toLowerCase();
-          const patternLower = competency.pattern.toLowerCase();
-          const memberLower = member.toLowerCase();
+          if (!key.includes('>>')) return;
+          
+          const parts = key.split('>>').map(part => part.trim());
+          if (parts.length < 2) return;
 
-          // Log each key-value pair for debugging
-          console.log(`Row ${rowIndex} - Checking key-value:`, {
-            key: keyLower,
-            value,
-            member: memberLower,
-            pattern: patternLower,
-            matches: {
-              hasPattern: keyLower.includes(patternLower),
-              hasMember: keyLower.includes(memberLower)
-            }
-          });
-
-          if (keyLower.includes(patternLower) && keyLower.includes(memberLower)) {
-            matchingKeys.push(key);
+          const questionText = parts[0];
+          const memberName = cleanMemberName(parts[1]);
+          
+          // Check if this column is relevant for our current member and competency
+          if (matchesCompetency(questionText, competency.pattern) && 
+              memberName === member) {
             
-            if (typeof value === 'string') {
-              // Normalize the value
-              const normalizedValue = normalizeEvaluationValue(value);
-              console.log(`Found match for ${member} - ${competency.name}:`, {
-                key,
-                original: value,
-                normalized: normalizedValue,
-                score: evaluationScores[normalizedValue]
+            logger.log('Found matching question', {
+              competency: competency.name,
+              patterns: competency.pattern,
+              question: questionText,
+              member: memberName,
+              key,
+              value
+            });
+
+            const answer = extractAnswer(key, value);
+            if (answer) {
+              const normalizedValue = normalizeEvaluationValue(answer);
+              matchedQuestions.push(questionText);
+              
+              logger.log('Processing answer', {
+                member,
+                competency: competency.name,
+                question: questionText,
+                answer,
+                normalizedValue,
+                hasScore: normalizedValue in evaluationScores,
+                originalValue: value,
+                headerParts: parts
               });
 
               if (normalizedValue in evaluationScores) {
                 const score = evaluationScores[normalizedValue];
                 totalScore += score;
                 count++;
+                answers.push({ question: questionText, answer: normalizedValue, score });
+
+                logger.log('Added score', {
+                  member,
+                  competency: competency.name,
+                  question: questionText,
+                  answer,
+                  normalizedValue,
+                  score,
+                  totalScore,
+                  count,
+                  answers
+                });
               }
             }
           }
         });
       });
 
-      // Calculate average score for this member and competency
-      const averageScore = count > 0 ? Math.round(totalScore / count) : 0;
-      console.log(`Final score for ${member} - ${competency.name}:`, {
+      const averageScore = count > 0 ? totalScore / count : 0;
+      logger.log('Final score calculated', {
+        member,
+        competency: competency.name,
         totalScore,
         count,
         averageScore,
-        matchingKeys
+        matchedQuestions,
+        allAnswers: answers
       });
       
       row[member] = averageScore;
@@ -265,9 +363,12 @@ export const parseCsvFile = async (file: File): Promise<any[]> => {
       skipEmptyLines: true,
       dynamicTyping: true,
       transformHeader: (header) => {
+        logger.log('CSV Header Found:', { header });
         return header.trim();
       },
-      transform: (value) => {
+      transform: (value, field) => {
+        logger.log('Processing CSV Field:', { field, value });
+        
         if (typeof value === 'string') {
           const lowerValue = value.toLowerCase().trim();
           if (lowerValue === 'true' || lowerValue === 'yes' || lowerValue === '1') return true;
@@ -275,8 +376,19 @@ export const parseCsvFile = async (file: File): Promise<any[]> => {
         }
         return value;
       },
-      complete: (results) => resolve(results.data),
-      error: (error) => reject(error)
+      complete: (results) => {
+        logger.log('CSV Parse Complete', {
+          fileName: file.name,
+          totalRows: results.data.length,
+          sampleRow: results.data[0],
+          allFields: results.data[0] ? Object.keys(results.data[0]) : []
+        });
+        resolve(results.data);
+      },
+      error: (error) => {
+        logger.error('CSV Parse Error', error);
+        reject(error);
+      }
     });
   });
 };
@@ -286,17 +398,20 @@ export const processChartData = async (files: File[]): Promise<ChartDataResponse
     const allData: any[] = [];
     
     for (const file of files) {
+      logger.log('Processing file:', { fileName: file.name });
       const parsedData = await parseCsvFile(file);
       allData.push(...parsedData);
     }
 
-    return {
+    const result = {
       radar: processRadarData(allData),
       bar: processBarData(allData),
       pie: processPieData(allData)
     };
+
+    return result;
   } catch (error) {
-    console.error('Error processing CSV files:', error);
+    logger.error('Error processing CSV files:', error);
     throw error;
   }
 };

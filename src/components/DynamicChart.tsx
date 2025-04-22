@@ -45,7 +45,7 @@ export const DynamicChart: React.FC<ChartProps> = ({ type, data, isLoading, erro
           <RadarChart data={data as RadarDataPoint[]}>
             <PolarGrid />
             <PolarAngleAxis dataKey="subject" />
-            <PolarRadiusAxis angle={30} domain={[0, 5]} />
+            <PolarRadiusAxis angle={30} domain={[0, 3]} />
             {Object.keys((data[0] as RadarDataPoint))
               .filter(key => key !== 'subject')
               .map((key, index) => (

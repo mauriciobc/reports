@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -57,14 +57,20 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
   const [activeTab, setActiveTab] = useState('competencies');
   const [focusedMember, setFocusedMember] = useState<string | null>(null);
 
-  const teamMemberColors = {
-    'Viviane': '#8884d8',
-    'Matheus': '#82ca9d',
-    'Lidineu': '#ffc658',
-    'Rafael Victor': '#ff8042',
-    'Paulo Henrique': '#0088fe',
-    'Yasmin': '#00C49F'
-  };
+  // Generate colors dynamically based on the data
+  const teamMemberColors = useMemo(() => {
+    if (!data?.radar || data.radar.length === 0) return {};
+    
+    // Get all member names from the first radar data point
+    const memberNames = Object.keys(data.radar[0])
+      .filter(key => key !== 'subject');
+    
+    // Generate colors using HSL for better distribution
+    return memberNames.reduce((acc, member, index) => ({
+      ...acc,
+      [member]: `hsl(${(index * 360) / memberNames.length}, 70%, 50%)`
+    }), {} as Record<string, string>);
+  }, [data?.radar]);
 
   const handleLegendClick = (member: string) => {
     setFocusedMember(current => current === member ? null : member);
@@ -111,8 +117,15 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data.radar}>
                 <PolarGrid gridType="polygon" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: '#666', fontSize: 12 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 5]} />
+                <PolarAngleAxis 
+                  dataKey="subject" 
+                  tick={{ fill: '#666', fontSize: 12 }}
+                />
+                <PolarRadiusAxis 
+                  angle={30} 
+                  domain={[0, 3]} 
+                  tickCount={4}
+                />
                 {Object.entries(teamMemberColors).map(([member, color]) => (
                   <Radar
                     key={member}
