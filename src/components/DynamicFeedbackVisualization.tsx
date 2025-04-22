@@ -55,6 +55,25 @@ const CustomTooltip: React.FC<TooltipProps> = ({ active, payload, label }) => {
 
 export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> = ({ data }) => {
   const [activeTab, setActiveTab] = useState('competencies');
+  const [focusedMember, setFocusedMember] = useState<string | null>(null);
+
+  const teamMemberColors = {
+    'Viviane': '#8884d8',
+    'Matheus': '#82ca9d',
+    'Lidineu': '#ffc658',
+    'Rafael Victor': '#ff8042',
+    'Paulo Henrique': '#0088fe',
+    'Yasmin': '#00C49F'
+  };
+
+  const handleLegendClick = (member: string) => {
+    setFocusedMember(current => current === member ? null : member);
+  };
+
+  const getOpacityForMember = (member: string) => {
+    if (!focusedMember) return 1;
+    return member === focusedMember ? 1 : 0.15;
+  };
 
   if (!data) {
     return (
@@ -88,21 +107,42 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
       
       <div className="h-[500px]">
         {activeTab === 'competencies' && (
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data.radar}>
-              <PolarGrid gridType="polygon" />
-              <PolarAngleAxis dataKey="subject" tick={{ fill: '#666', fontSize: 12 }} />
-              <PolarRadiusAxis angle={30} domain={[0, 5]} />
-              <Radar name="Viviane" dataKey="Viviane" stroke="#8884d8" fill="#8884d8" fillOpacity={0.2} />
-              <Radar name="Matheus" dataKey="Matheus" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.2} />
-              <Radar name="Lidineu" dataKey="Lidineu" stroke="#ffc658" fill="#ffc658" fillOpacity={0.2} />
-              <Radar name="Rafael Victor" dataKey="Rafael Victor" stroke="#ff8042" fill="#ff8042" fillOpacity={0.2} />
-              <Radar name="Paulo Henrique" dataKey="Paulo Henrique" stroke="#0088fe" fill="#0088fe" fillOpacity={0.2} />
-              <Radar name="Yasmin" dataKey="Yasmin" stroke="#00C49F" fill="#00C49F" fillOpacity={0.2} />
-              <Legend />
-              <Tooltip content={<CustomTooltip />} />
-            </RadarChart>
-          </ResponsiveContainer>
+          <>
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data.radar}>
+                <PolarGrid gridType="polygon" />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: '#666', fontSize: 12 }} />
+                <PolarRadiusAxis angle={30} domain={[0, 5]} />
+                {Object.entries(teamMemberColors).map(([member, color]) => (
+                  <Radar
+                    key={member}
+                    name={member}
+                    dataKey={member}
+                    stroke={color}
+                    fill={color}
+                    fillOpacity={getOpacityForMember(member) * 0.2}
+                    strokeOpacity={getOpacityForMember(member)}
+                  />
+                ))}
+                <Tooltip content={<CustomTooltip />} />
+                <Legend
+                  onClick={(e) => handleLegendClick(e.value)}
+                  formatter={(value, entry) => (
+                    <span style={{ 
+                      color: focusedMember ? (value === focusedMember ? '#666' : '#999') : '#666',
+                      cursor: 'pointer',
+                      fontWeight: value === focusedMember ? 'bold' : 'normal'
+                    }}>
+                      {value}
+                    </span>
+                  )}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+            <div className="text-center text-sm text-gray-600 mt-2">
+              Clique em um nome na legenda para destacar seus dados
+            </div>
+          </>
         )}
         
         {activeTab === 'strengths' && (
@@ -162,16 +202,6 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
             </PieChart>
           </ResponsiveContainer>
         )}
-      </div>
-      
-      <div className="mt-6 p-4 bg-gray-100 rounded-lg">
-        <h2 className="text-lg font-bold mb-2">Principais Insights:</h2>
-        <ul className="list-disc pl-5 space-y-2">
-          <li>A equipe demonstra forte comprometimento e cooperação mútua</li>
-          <li>Excelente capacidade técnica e resolução de problemas</li>
-          <li>Oportunidades de melhoria na comunicação e documentação</li>
-          <li>Alto nível de adaptabilidade às mudanças e novos desafios</li>
-        </ul>
       </div>
     </div>
   );
