@@ -64,12 +64,19 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
     // Get all member names from the first radar data point
     const memberNames = Object.keys(data.radar[0])
       .filter(key => key !== 'subject');
-    
+
     // Generate colors using HSL for better distribution
-    return memberNames.reduce((acc, member, index) => ({
-      ...acc,
-      [member]: `hsl(${(index * 360) / memberNames.length}, 70%, 50%)`
-    }), {} as Record<string, string>);
+    // Use golden ratio to ensure good color distribution regardless of member count
+    const goldenRatio = 0.618033988749895;
+    let hue = Math.random(); // Start at random color
+
+    return memberNames.reduce((acc, member) => {
+      hue = (hue + goldenRatio) % 1;
+      return {
+        ...acc,
+        [member]: `hsl(${Math.floor(hue * 360)}, 70%, 50%)`
+      };
+    }, {} as Record<string, string>);
   }, [data?.radar]);
 
   const handleLegendClick = (member: string) => {
@@ -88,6 +95,11 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
       </div>
     );
   }
+
+  // Validate that we have data for the radar chart
+  const hasValidRadarData = data.radar && 
+    data.radar.length > 0 && 
+    Object.keys(data.radar[0]).filter(key => key !== 'subject').length > 0;
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 max-w-6xl mx-auto">
@@ -114,47 +126,55 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
       <div className="h-[500px]">
         {activeTab === 'competencies' && (
           <>
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data.radar}>
-                <PolarGrid gridType="polygon" />
-                <PolarAngleAxis 
-                  dataKey="subject" 
-                  tick={{ fill: '#666', fontSize: 12 }}
-                />
-                <PolarRadiusAxis 
-                  angle={30} 
-                  domain={[0, 3]} 
-                  tickCount={4}
-                />
-                {Object.entries(teamMemberColors).map(([member, color]) => (
-                  <Radar
-                    key={member}
-                    name={member}
-                    dataKey={member}
-                    stroke={color}
-                    fill={color}
-                    fillOpacity={getOpacityForMember(member) * 0.2}
-                    strokeOpacity={getOpacityForMember(member)}
-                  />
-                ))}
-                <Tooltip content={<CustomTooltip />} />
-                <Legend
-                  onClick={(e) => handleLegendClick(e.value)}
-                  formatter={(value, entry) => (
-                    <span style={{ 
-                      color: focusedMember ? (value === focusedMember ? '#666' : '#999') : '#666',
-                      cursor: 'pointer',
-                      fontWeight: value === focusedMember ? 'bold' : 'normal'
-                    }}>
-                      {value}
-                    </span>
-                  )}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-            <div className="text-center text-sm text-gray-600 mt-2">
-              Clique em um nome na legenda para destacar seus dados
-            </div>
+            {hasValidRadarData ? (
+              <>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data.radar}>
+                    <PolarGrid gridType="polygon" />
+                    <PolarAngleAxis 
+                      dataKey="subject" 
+                      tick={{ fill: '#666', fontSize: 12 }}
+                    />
+                    <PolarRadiusAxis 
+                      angle={30} 
+                      domain={[0, 3]} 
+                      tickCount={4}
+                    />
+                    {Object.entries(teamMemberColors).map(([member, color]) => (
+                      <Radar
+                        key={member}
+                        name={member}
+                        dataKey={member}
+                        stroke={color}
+                        fill={color}
+                        fillOpacity={getOpacityForMember(member) * 0.2}
+                        strokeOpacity={getOpacityForMember(member)}
+                      />
+                    ))}
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend
+                      onClick={(e) => handleLegendClick(e.value)}
+                      formatter={(value, entry) => (
+                        <span style={{ 
+                          color: focusedMember ? (value === focusedMember ? '#666' : '#999') : '#666',
+                          cursor: 'pointer',
+                          fontWeight: value === focusedMember ? 'bold' : 'normal'
+                        }}>
+                          {value}
+                        </span>
+                      )}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+                <div className="text-center text-sm text-gray-600 mt-2">
+                  Clique em um nome na legenda para destacar seus dados
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-600">
+                Não há dados suficientes para gerar o gráfico de competências
+              </div>
+            )}
           </>
         )}
         

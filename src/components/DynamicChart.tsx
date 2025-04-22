@@ -6,6 +6,20 @@ import {
 } from 'recharts';
 import { RadarDataPoint, BarDataPoint, PieDataPoint } from '../utils/dataMappers';
 
+// Carefully selected colors for good category separation
+const COLORS = [
+  '#2E86AB', // Blue
+  '#A23B72', // Purple-Pink
+  '#F18F01', // Orange
+  '#2AA876', // Green
+  '#C73E1D', // Red
+  '#1D7AA2', // Light Blue
+  '#6B4E71', // Muted Purple
+  '#F49320', // Light Orange
+  '#3B7A57', // Forest Green
+  '#B22222', // Fire Brick
+];
+
 interface ChartProps {
   type: 'radar' | 'bar' | 'pie';
   data: RadarDataPoint[] | BarDataPoint[] | PieDataPoint[];
@@ -73,7 +87,11 @@ export const DynamicChart: React.FC<ChartProps> = ({ type, data, isLoading, erro
             <YAxis dataKey="name" type="category" width={150} />
             <Tooltip />
             <Legend />
-            <Bar dataKey="value" fill="#8884d8" />
+            <Bar dataKey="value">
+              {(data as BarDataPoint[]).map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       );
