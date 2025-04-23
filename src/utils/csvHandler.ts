@@ -510,7 +510,7 @@ export function processPieData(data: any[]): PieData[] {
             totalEvaluations.total++;
             break;
           case 'Precisa melhorar':
-            evaluationCounts['Precisa melhorar']++;
+            evaluationCounts['Pode melhorar']++;
             totalEvaluations.total++;
             break;
           default:
