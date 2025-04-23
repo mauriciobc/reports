@@ -534,17 +534,17 @@ export function processPieData(data: any[]): PieData[] {
     {
       name: 'Pode melhorar',
       value: (evaluationCounts['Pode melhorar'] / totalEvaluations.total) * 100,
-      color: '#ff6b6b'
+      color: '#FFC107'  // Yellow
     },
     {
       name: 'Atende às expectativas',
       value: (evaluationCounts['Atende às expectativas'] / totalEvaluations.total) * 100,
-      color: '#4ecdc4'
+      color: '#2196F3'  // Light blue
     },
     {
       name: 'Supera as expectativas',
       value: (evaluationCounts['Supera as expectativas'] / totalEvaluations.total) * 100,
-      color: '#45b7d1'
+      color: '#4CAF50'  // Green
     }
   ];
 }
