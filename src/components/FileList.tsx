@@ -1,6 +1,8 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { processChartData } from '../utils/csvHandler';
 import { readCSVFiles } from '../utils/fileReader';
+import { logger } from '../utils/logger';
+import { ensureDataDirectory } from '../utils/ensureDataDir';
 
 interface FileListProps {
   onDataProcessed: (data: any) => void;
@@ -19,6 +21,18 @@ const FileList: React.FC<FileListProps> = ({ onDataProcessed }) => {
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [isExpanded, setIsExpanded] = useState(true);
   const [hasProcessedFiles, setHasProcessedFiles] = useState(false);
+  const [isDataDirReady, setIsDataDirReady] = useState(false);
+
+  useEffect(() => {
+    const checkDataDir = async () => {
+      const exists = await ensureDataDirectory();
+      setIsDataDirReady(exists);
+      if (!exists) {
+        logger.error('Data directory is not accessible. Please ensure /public/data exists and contains your CSV files.');
+      }
+    };
+    checkDataDir();
+  }, []);
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -26,7 +40,7 @@ const FileList: React.FC<FileListProps> = ({ onDataProcessed }) => {
 
     try {
       const fileNames = Array.from(files).map(f => f.name);
-      console.log('Files selected for upload:', fileNames);
+      logger.info('Files selected for upload:', fileNames);
       const data = await processChartData(Array.from(files));
       onDataProcessed(data);
       setUploadedFiles(fileNames);
@@ -34,27 +48,46 @@ const FileList: React.FC<FileListProps> = ({ onDataProcessed }) => {
       setHasProcessedFiles(true);
       setIsExpanded(false);
     } catch (error) {
-      console.error('Error processing files:', error);
+      logger.error('Error processing files:', error);
       alert('Erro ao processar os arquivos. Por favor, verifique o formato dos CSVs.');
     }
   }, [onDataProcessed]);
 
   const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedOptions = Array.from(event.target.selectedOptions).map(option => option.value);
+    
+    if (selectedOptions.length === 0) {
+      alert('Por favor, selecione pelo menos um arquivo.');
+      return;
+    }
+
     setSelectedFiles(selectedOptions);
     setUploadedFiles([]);
 
     try {
-      console.log('Files selected from list:', selectedOptions);
+      logger.info('Files selected from list:', selectedOptions);
       const files = await readCSVFiles(selectedOptions);
-      console.log('Files loaded:', files.map(f => f.name));
+      
+      if (!files || files.length === 0) {
+        throw new Error('Nenhum arquivo foi carregado');
+      }
+
+      logger.info('Files loaded:', files.map(f => f.name));
       const data = await processChartData(files);
+      
+      if (!data) {
+        throw new Error('Erro ao processar os dados dos arquivos');
+      }
+
       onDataProcessed(data);
       setHasProcessedFiles(true);
       setIsExpanded(false);
     } catch (error) {
-      console.error('Error processing selected files:', error);
-      alert('Erro ao processar os arquivos selecionados.');
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao processar os arquivos';
+      logger.error('Error processing selected files:', { error, message: errorMessage });
+      alert(`Erro ao processar os arquivos selecionados: ${errorMessage}`);
+      setSelectedFiles([]);
+      setHasProcessedFiles(false);
     }
   }, [onDataProcessed]);
 
@@ -85,6 +118,23 @@ const FileList: React.FC<FileListProps> = ({ onDataProcessed }) => {
 
   return (
     <div className="mb-6">
+      {!isDataDirReady && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                O diretório de dados não está acessível. Certifique-se de que a pasta /public/data existe e contém seus arquivos CSV.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-lg font-semibold">Selecione um arquivo</h2>
         <button

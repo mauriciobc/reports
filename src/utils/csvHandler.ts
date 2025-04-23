@@ -91,7 +91,58 @@ const normalizeEvaluationValue = (value: string): string => {
   return withoutEmojis;
 };
 
+<<<<<<< HEAD
 const processRadarData = (data: any[]): RadarData[] => {
+=======
+// Helper function to determine field category
+const getFieldCategory = (field: string): string | null => {
+  const cleanField = field.toLowerCase().trim();
+  
+  if (cleanField.includes('resolução de problemas') || 
+      cleanField.includes('resolver problemas') ||
+      cleanField.includes('resolução problemas') ||
+      cleanField.includes('resolveu problemas') ||
+      cleanField.includes('capacidade de analisar problemas')) {
+    return 'Resolução Problemas';
+  }
+  
+  if (cleanField.includes('comunicação') ||
+      cleanField.includes('comunicar') ||
+      cleanField.includes('apresentação')) {
+    return 'Comunicação';
+  }
+  
+  if (cleanField.includes('cooperação') ||
+      cleanField.includes('cooperar') ||
+      cleanField.includes('ajuda mútua')) {
+    return 'Cooperação';
+  }
+  
+  if (cleanField.includes('comprometimento') ||
+      cleanField.includes('dedicação') ||
+      cleanField.includes('foco em resultados')) {
+    return 'Comprometimento';
+  }
+  
+  if (cleanField.includes('domínio técnico') ||
+      cleanField.includes('conhecimento técnico') ||
+      cleanField.includes('expertise técnica')) {
+    return 'Domínio Técnico';
+  }
+  
+  return null;
+};
+
+// Helper function to normalize collaborator names
+const normalizeCollaboratorName = (name: string): string => {
+  return name
+    .split('_')[0]  // Remove _1, _2, etc. suffixes
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // Remove accents
+    .trim();  // Remove extra spaces
+};
+
+export function processRadarData(data: any[]): RadarData {
+>>>>>>> 73b78a8 (Refactor logging across components: replace console logs with a centralized logger for improved error handling and debugging, enhance data processing feedback, and ensure consistent logging practices throughout the application.)
   const competencies = [
     { name: 'Cooperação', pattern: ['cooperação', 'coopera', 'ajuda mútua'] },
     { name: 'Comunicação', pattern: ['comunicação', 'comunica'] },
@@ -100,10 +151,17 @@ const processRadarData = (data: any[]): RadarData[] => {
     { name: 'Resolução Problemas', pattern: ['problemas', 'resolução', 'solução'] }
   ];
 
+<<<<<<< HEAD
   logger.log('Starting radar data processing', {
     dataRows: data.length,
     competencies: competencies.map(c => ({ name: c.name, patterns: c.pattern }))
   });
+=======
+  // First, group evaluations by collaborator
+  const collaboratorEvaluations: { [key: string]: { [key: string]: { total: number; count: number } } } = {};
+  const allCollaborators = new Set<string>();
+  const nameMapping: { [key: string]: string } = {};  // Map normalized names to original names
+>>>>>>> 73b78a8 (Refactor logging across components: replace console logs with a centralized logger for improved error handling and debugging, enhance data processing feedback, and ensure consistent logging practices throughout the application.)
 
   // Helper function to clean member name
   const cleanMemberName = (name: string): string => {
@@ -119,6 +177,7 @@ const processRadarData = (data: any[]): RadarData[] => {
     });
   };
 
+<<<<<<< HEAD
   // Helper function to extract member name from a column header
   const extractMemberName = (header: string): string | null => {
     if (!header.includes('>>')) return null;
@@ -135,6 +194,45 @@ const processRadarData = (data: any[]): RadarData[] => {
 
     return memberName;
   };
+=======
+      // Extract collaborator name from the field (format: "Question >> Name >> Evaluation")
+      const parts = field.split('>>').map(part => part.trim());
+      if (parts.length < 2) return;
+      
+      const originalName = parts[1];
+      const normalizedName = normalizeCollaboratorName(originalName);
+      
+      // Store the original name for this normalized version
+      if (!nameMapping[normalizedName]) {
+        nameMapping[normalizedName] = originalName;
+      }
+      
+      allCollaborators.add(normalizedName);
+      
+      // Use getFieldCategory to determine the competency
+      const matchingCompetency = getFieldCategory(field);
+
+      if (matchingCompetency && competencies.includes(matchingCompetency)) {
+        // Initialize collaborator data if not exists
+        if (!collaboratorEvaluations[normalizedName]) {
+          collaboratorEvaluations[normalizedName] = {};
+          competencies.forEach(comp => {
+            collaboratorEvaluations[normalizedName][comp] = { total: 0, count: 0 };
+          });
+        }
+
+        // Get the normalized evaluation value
+        const normalizedValue = normalizeEvaluationValue(value);
+        
+        logger.log('Processing competency field', {
+          field,
+          value,
+          originalName,
+          normalizedName,
+          matchingCompetency,
+          normalizedValue
+        });
+>>>>>>> 73b78a8 (Refactor logging across components: replace console logs with a centralized logger for improved error handling and debugging, enhance data processing feedback, and ensure consistent logging practices throughout the application.)
 
   // Helper function to extract answer from column
   const extractAnswer = (key: string, value: any): string | null => {
@@ -155,6 +253,7 @@ const processRadarData = (data: any[]): RadarData[] => {
       }
     }
 
+<<<<<<< HEAD
     return null;
   };
 
@@ -168,6 +267,19 @@ const processRadarData = (data: any[]): RadarData[] => {
         logger.log('Found team member', { 
           memberName, 
           originalHeader: header 
+=======
+        // Update the totals and counts
+        collaboratorEvaluations[normalizedName][matchingCompetency].total += score;
+        collaboratorEvaluations[normalizedName][matchingCompetency].count++;
+
+        logger.log('Updated collaborator score', {
+          originalName,
+          normalizedName,
+          competency: matchingCompetency,
+          score,
+          newTotal: collaboratorEvaluations[normalizedName][matchingCompetency].total,
+          newCount: collaboratorEvaluations[normalizedName][matchingCompetency].count
+>>>>>>> 73b78a8 (Refactor logging across components: replace console logs with a centralized logger for improved error handling and debugging, enhance data processing feedback, and ensure consistent logging practices throughout the application.)
         });
       }
     });
@@ -179,6 +291,7 @@ const processRadarData = (data: any[]): RadarData[] => {
     members: teamMembersArray
   });
 
+<<<<<<< HEAD
   // Process data for each competency
   return competencies.map(competency => {
     const row: RadarData = { subject: competency.name };
@@ -265,13 +378,67 @@ const processRadarData = (data: any[]): RadarData[] => {
       });
       
       row[member] = averageScore;
+=======
+  // Track members with no ratings
+  const membersWithNoRatings = new Set<string>();
+  const membersWithSomeRatings = new Set<string>();
+
+  // Convert the grouped data into the final format
+  const radarData = competencies.map(competency => {
+    const dataPoint = {
+      competency,
+      collaborators: {} as { [key: string]: number }
+    };
+
+    // Calculate average for each collaborator
+    Object.entries(collaboratorEvaluations).forEach(([normalizedName, evaluations]) => {
+      const { total, count } = evaluations[competency];
+      const score = count > 0 ? Number((total / count).toFixed(2)) : 0;
+      // Only include collaborators with non-zero scores
+      if (score > 0) {
+        // Use the original name in the output
+        dataPoint.collaborators[nameMapping[normalizedName]] = score;
+        membersWithSomeRatings.add(normalizedName);
+      }
+>>>>>>> 73b78a8 (Refactor logging across components: replace console logs with a centralized logger for improved error handling and debugging, enhance data processing feedback, and ensure consistent logging practices throughout the application.)
     });
 
     return row;
   });
 };
 
+<<<<<<< HEAD
 const processBarData = (data: any[]): BarData[] => {
+=======
+  // Find members with no ratings at all
+  allCollaborators.forEach(normalizedName => {
+    if (!membersWithSomeRatings.has(normalizedName)) {
+      // Use the original name in the output
+      membersWithNoRatings.add(nameMapping[normalizedName]);
+    }
+  });
+
+  // Log information about members with no ratings
+  logger.log('Members with no ratings', {
+    count: membersWithNoRatings.size,
+    members: Array.from(membersWithNoRatings)
+  });
+
+  logger.log('Final radar data', { 
+    data: radarData,
+    totalMembers: allCollaborators.size,
+    membersIncluded: membersWithSomeRatings.size,
+    membersExcluded: Array.from(membersWithNoRatings)
+  });
+
+  return { 
+    data: radarData,
+    membersWithNoRatings: Array.from(membersWithNoRatings)
+  };
+}
+
+const processBarData = (data: any[]): StrengthEvaluation[] => {
+>>>>>>> 73b78a8 (Refactor logging across components: replace console logs with a centralized logger for improved error handling and debugging, enhance data processing feedback, and ensure consistent logging practices throughout the application.)
   const strengthCategories = [
     { name: 'Domínio técnico', pattern: 'Excelente domínio técnico da área' },
     { name: 'Adaptabilidade', pattern: 'Facilidade de adaptação a mudanças e novas demandas' },
