@@ -7,6 +7,7 @@ export interface RadarDataPoint {
 
 export interface RadarData {
   data: RadarDataPoint[];
+  membersWithNoRatings: string[];
 }
 
 export interface BarData {

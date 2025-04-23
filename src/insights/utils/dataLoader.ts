@@ -1,4 +1,5 @@
 import { parse } from 'papaparse';
+import { logger } from '../../utils/logger';
 
 export interface FeedbackData {
   timestamp: string;
@@ -26,7 +27,7 @@ export async function loadFeedbackData(filePath: string): Promise<FeedbackData[]
       });
     });
   } catch (error) {
-    console.error('Error loading feedback data:', error);
+    logger.error('Error loading feedback data:', error);
     throw error;
   }
 }
