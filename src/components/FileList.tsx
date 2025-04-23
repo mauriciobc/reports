@@ -86,7 +86,7 @@ const FileList: React.FC<FileListProps> = ({ onDataProcessed }) => {
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-semibold">Seleção de Arquivos CSV</h2>
+        <h2 className="text-lg font-semibold">Selecione um arquivo</h2>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="p-1 text-sm text-blue-600 hover:text-blue-800 focus:outline-none flex items-center gap-1 group"
@@ -102,7 +102,7 @@ const FileList: React.FC<FileListProps> = ({ onDataProcessed }) => {
       {isExpanded && (
         <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg">
           <p className="text-sm text-gray-600 mb-4">
-            Selecione os arquivos CSV de feedback disponíveis ou faça upload de novos arquivos:
+            Selecione um arquivo CSV de feedback disponível ou faça upload de um novo arquivo:
           </p>
           
           <div className="space-y-4">
