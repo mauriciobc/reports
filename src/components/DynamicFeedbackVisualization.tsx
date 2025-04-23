@@ -39,7 +39,7 @@ interface TooltipProps {
   label?: string;
 }
 
-const CustomTooltip: React.FC<TooltipProps> = ({ active, payload, label }) => {
+const CustomTooltip: React.FC<TooltipProps> = ({ active, payload }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white p-3 border rounded shadow">
@@ -102,25 +102,39 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
     Object.keys(data.radar[0]).filter(key => key !== 'subject').length > 0;
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-6xl mx-auto">
+    <div className="bg-white rounded-lg shadow-lg p-6 pb-12 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold text-center mb-6">Análise de Feedback 360° Equipe DEV</h1>
       
-      <div className="flex justify-center mb-6">
-        <button 
-          className={`px-4 py-2 mx-2 rounded-md transition-colors duration-200 ${activeTab === 'competencies' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
-          onClick={() => setActiveTab('competencies')}>
-          Competências por Colaborador
-        </button>
-        <button 
-          className={`px-4 py-2 mx-2 rounded-md transition-colors duration-200 ${activeTab === 'strengths' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
-          onClick={() => setActiveTab('strengths')}>
-          Pontos Fortes da Equipe
-        </button>
-        <button 
-          className={`px-4 py-2 mx-2 rounded-md transition-colors duration-200 ${activeTab === 'ratings' ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
-          onClick={() => setActiveTab('ratings')}>
-          Distribuição de Avaliações
-        </button>
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex justify-center space-x-8">
+          <button 
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+              activeTab === 'competencies' 
+                ? 'border-blue-500 text-blue-600' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+            onClick={() => setActiveTab('competencies')}>
+            Competências por Colaborador
+          </button>
+          <button 
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+              activeTab === 'strengths' 
+                ? 'border-blue-500 text-blue-600' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+            onClick={() => setActiveTab('strengths')}>
+            Pontos Fortes da Equipe
+          </button>
+          <button 
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+              activeTab === 'ratings' 
+                ? 'border-blue-500 text-blue-600' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+            onClick={() => setActiveTab('ratings')}>
+            Distribuição de Avaliações
+          </button>
+        </nav>
       </div>
       
       <div className="h-[500px]">
@@ -154,7 +168,7 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
                     <Tooltip content={<CustomTooltip />} />
                     <Legend
                       onClick={(e) => handleLegendClick(e.value)}
-                      formatter={(value, entry) => (
+                      formatter={(value) => (
                         <span style={{ 
                           color: focusedMember ? (value === focusedMember ? '#666' : '#999') : '#666',
                           cursor: 'pointer',
@@ -208,7 +222,7 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
                 cx="50%"
                 cy="50%"
                 labelLine={true}
-                label={({ name, value }) => value > 0 ? `${value.toFixed(1)}%` : ''}
+                label={({ value }) => value > 0 ? `${value.toFixed(1)}%` : ''}
                 outerRadius={160}
                 innerRadius={80}
                 fill="#8884d8"
@@ -227,7 +241,7 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
               <Legend 
                 verticalAlign="bottom" 
                 height={36}
-                formatter={(value, entry: any) => {
+                formatter={(value) => {
                   const item = data.pie.find(d => d.name === value);
                   return `${value} (${item ? item.value.toFixed(1) : 0}%)`;
                 }}
