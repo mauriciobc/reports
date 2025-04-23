@@ -3,6 +3,7 @@ import { OpenAI } from 'node-openai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChartDataResponse } from '../utils/csvHandler';
+import { logger } from '../utils/logger';
 
 interface InsightsCardProps {
   data: ChartDataResponse;
@@ -76,7 +77,7 @@ Keep the analysis concise but informative.`;
 
       setInsights(content);
     } catch (err) {
-      console.error('Error generating insights:', err);
+      logger.error('Error generating insights:', err);
       setError(
         err instanceof Error 
           ? `Failed to generate insights: ${err.message}` 

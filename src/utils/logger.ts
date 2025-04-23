@@ -1,8 +1,12 @@
 class Logger {
   private logs: string[] = [];
   private static instance: Logger;
+  private isDevelopment: boolean;
 
-  private constructor() {}
+  private constructor() {
+    // Check if we're in development environment
+    this.isDevelopment = process.env.NODE_ENV === 'development';
+  }
 
   static getInstance(): Logger {
     if (!Logger.instance) {
@@ -11,25 +15,41 @@ class Logger {
     return Logger.instance;
   }
 
-  log(message: string, data?: any) {
+  private formatLogEntry(level: string, message: string, data?: any): string {
     const timestamp = new Date().toISOString();
-    const logEntry = `${timestamp} - ${message}${data ? '\nData: ' + JSON.stringify(data, null, 2) : ''}`;
+    return `${timestamp} - ${level}: ${message}${data ? '\nData: ' + JSON.stringify(data, null, 2) : ''}`;
+  }
+
+  log(message: string, data?: any) {
+    const logEntry = this.formatLogEntry('INFO', message, data);
     this.logs.push(logEntry);
-    console.log(logEntry);
+    if (this.isDevelopment) {
+      console.log(logEntry);
+    }
+  }
+
+  info(message: string, data?: any) {
+    const logEntry = this.formatLogEntry('INFO', message, data);
+    this.logs.push(logEntry);
+    if (this.isDevelopment) {
+      console.log(logEntry);
+    }
   }
 
   error(message: string, error?: any) {
-    const timestamp = new Date().toISOString();
-    const logEntry = `${timestamp} - ERROR: ${message}${error ? '\nError: ' + JSON.stringify(error, null, 2) : ''}`;
+    const logEntry = this.formatLogEntry('ERROR', message, error);
     this.logs.push(logEntry);
-    console.error(logEntry);
+    if (this.isDevelopment) {
+      console.error(logEntry);
+    }
   }
 
   warn(message: string, data?: any) {
-    const timestamp = new Date().toISOString();
-    const logEntry = `${timestamp} - WARNING: ${message}${data ? '\nData: ' + JSON.stringify(data, null, 2) : ''}`;
+    const logEntry = this.formatLogEntry('WARNING', message, data);
     this.logs.push(logEntry);
-    console.warn(logEntry);
+    if (this.isDevelopment) {
+      console.warn(logEntry);
+    }
   }
 
   downloadLogs() {

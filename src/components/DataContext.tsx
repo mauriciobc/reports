@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { ChartDataResponse } from '../utils/csvHandler';
+import { logger } from '../utils/logger';
 
 interface DataContextType {
   chartData: ChartDataResponse | null;
@@ -45,7 +46,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 export const DataContextWrapper: React.FC<{ children: ReactNode }> = ({ children }) => {
   const handleDataProcessed = (data: ChartDataResponse) => {
     // You can add any data processing or validation here
-    console.log('Data processed:', data);
+    logger.log('Data processed:', data);
   };
 
   return (

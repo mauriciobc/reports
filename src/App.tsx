@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DynamicFeedbackVisualization } from './components/DynamicFeedbackVisualization';
 import FileList from './components/FileList';
 import { ChartDataResponse } from './utils/csvHandler';
+import { logger } from './utils/logger';
 
 const App: React.FC = () => {
   const [chartData, setChartData] = useState<ChartDataResponse | null>(null);
@@ -14,11 +15,11 @@ const App: React.FC = () => {
         throw new Error('Invalid data structure received');
       }
       
-      console.log('Data received:', data);
+      logger.info('Data received:', data);
       setError(null);
       setChartData(data);
     } catch (err) {
-      console.error('Error processing data:', err);
+      logger.error('Error processing data:', err);
       setError(err instanceof Error ? err.message : 'Unknown error processing data');
       setChartData(null);
     }

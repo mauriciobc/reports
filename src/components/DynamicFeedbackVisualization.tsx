@@ -284,12 +284,6 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
     <div className="bg-white rounded-lg shadow-lg p-6 pb-12 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-center flex-grow">Análise de Feedback 360° Equipe DEV</h1>
-        <button
-          onClick={handleDownloadLogs}
-          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-sm"
-        >
-          Download Logs
-        </button>
       </div>
       
       <div className="border-b border-gray-200 mb-6">
@@ -329,6 +323,11 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
           <>
             {data?.radar?.data && data.radar.data.length > 0 ? (
               <>
+                {data.radar.membersWithNoRatings && data.radar.membersWithNoRatings.length > 0 && (
+                  <div className="text-right text-sm text-gray-500 italic mb-2">
+                    Sem avaliações: {data.radar.membersWithNoRatings.join(', ')}
+                  </div>
+                )}
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data.radar.data}>
                     <PolarGrid gridType="polygon" />

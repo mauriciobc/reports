@@ -189,6 +189,14 @@ const getFieldCategory = (field: string): string | null => {
   return null;
 };
 
+// Helper function to normalize collaborator names
+const normalizeCollaboratorName = (name: string): string => {
+  return name
+    .split('_')[0]  // Remove _1, _2, etc. suffixes
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // Remove accents
+    .trim();  // Remove extra spaces
+};
+
 export function processRadarData(data: any[]): RadarData {
   const competencies = [
     'Cooperação',
@@ -200,6 +208,8 @@ export function processRadarData(data: any[]): RadarData {
 
   // First, group evaluations by collaborator
   const collaboratorEvaluations: { [key: string]: { [key: string]: { total: number; count: number } } } = {};
+  const allCollaborators = new Set<string>();
+  const nameMapping: { [key: string]: string } = {};  // Map normalized names to original names
 
   // Process each row of data
   data.forEach(row => {
@@ -214,17 +224,25 @@ export function processRadarData(data: any[]): RadarData {
       const parts = field.split('>>').map(part => part.trim());
       if (parts.length < 2) return;
       
-      const collaboratorName = parts[1];
+      const originalName = parts[1];
+      const normalizedName = normalizeCollaboratorName(originalName);
+      
+      // Store the original name for this normalized version
+      if (!nameMapping[normalizedName]) {
+        nameMapping[normalizedName] = originalName;
+      }
+      
+      allCollaborators.add(normalizedName);
       
       // Use getFieldCategory to determine the competency
       const matchingCompetency = getFieldCategory(field);
 
       if (matchingCompetency && competencies.includes(matchingCompetency)) {
         // Initialize collaborator data if not exists
-        if (!collaboratorEvaluations[collaboratorName]) {
-          collaboratorEvaluations[collaboratorName] = {};
+        if (!collaboratorEvaluations[normalizedName]) {
+          collaboratorEvaluations[normalizedName] = {};
           competencies.forEach(comp => {
-            collaboratorEvaluations[collaboratorName][comp] = { total: 0, count: 0 };
+            collaboratorEvaluations[normalizedName][comp] = { total: 0, count: 0 };
           });
         }
 
@@ -234,7 +252,8 @@ export function processRadarData(data: any[]): RadarData {
         logger.log('Processing competency field', {
           field,
           value,
-          collaborator: collaboratorName,
+          originalName,
+          normalizedName,
           matchingCompetency,
           normalizedValue
         });
@@ -256,19 +275,24 @@ export function processRadarData(data: any[]): RadarData {
         }
 
         // Update the totals and counts
-        collaboratorEvaluations[collaboratorName][matchingCompetency].total += score;
-        collaboratorEvaluations[collaboratorName][matchingCompetency].count++;
+        collaboratorEvaluations[normalizedName][matchingCompetency].total += score;
+        collaboratorEvaluations[normalizedName][matchingCompetency].count++;
 
         logger.log('Updated collaborator score', {
-          collaborator: collaboratorName,
+          originalName,
+          normalizedName,
           competency: matchingCompetency,
           score,
-          newTotal: collaboratorEvaluations[collaboratorName][matchingCompetency].total,
-          newCount: collaboratorEvaluations[collaboratorName][matchingCompetency].count
+          newTotal: collaboratorEvaluations[normalizedName][matchingCompetency].total,
+          newCount: collaboratorEvaluations[normalizedName][matchingCompetency].count
         });
       }
     });
   });
+
+  // Track members with no ratings
+  const membersWithNoRatings = new Set<string>();
+  const membersWithSomeRatings = new Set<string>();
 
   // Convert the grouped data into the final format
   const radarData = competencies.map(competency => {
@@ -278,9 +302,15 @@ export function processRadarData(data: any[]): RadarData {
     };
 
     // Calculate average for each collaborator
-    Object.entries(collaboratorEvaluations).forEach(([collaborator, evaluations]) => {
+    Object.entries(collaboratorEvaluations).forEach(([normalizedName, evaluations]) => {
       const { total, count } = evaluations[competency];
-      dataPoint.collaborators[collaborator] = count > 0 ? Number((total / count).toFixed(2)) : 0;
+      const score = count > 0 ? Number((total / count).toFixed(2)) : 0;
+      // Only include collaborators with non-zero scores
+      if (score > 0) {
+        // Use the original name in the output
+        dataPoint.collaborators[nameMapping[normalizedName]] = score;
+        membersWithSomeRatings.add(normalizedName);
+      }
     });
 
     logger.log('Calculated competency data point', {
@@ -291,9 +321,31 @@ export function processRadarData(data: any[]): RadarData {
     return dataPoint;
   });
 
-  logger.log('Final radar data', { data: radarData });
+  // Find members with no ratings at all
+  allCollaborators.forEach(normalizedName => {
+    if (!membersWithSomeRatings.has(normalizedName)) {
+      // Use the original name in the output
+      membersWithNoRatings.add(nameMapping[normalizedName]);
+    }
+  });
 
-  return { data: radarData };
+  // Log information about members with no ratings
+  logger.log('Members with no ratings', {
+    count: membersWithNoRatings.size,
+    members: Array.from(membersWithNoRatings)
+  });
+
+  logger.log('Final radar data', { 
+    data: radarData,
+    totalMembers: allCollaborators.size,
+    membersIncluded: membersWithSomeRatings.size,
+    membersExcluded: Array.from(membersWithNoRatings)
+  });
+
+  return { 
+    data: radarData,
+    membersWithNoRatings: Array.from(membersWithNoRatings)
+  };
 }
 
 const processBarData = (data: any[]): StrengthEvaluation[] => {
