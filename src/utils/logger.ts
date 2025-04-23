@@ -1,13 +1,4 @@
 class Logger {
-<<<<<<< HEAD
-  log(message: string, data?: any) {
-    console.log(message, data);
-  }
-
-  error(message: string, error?: any) {
-    const errorDetails = error ? `\nError: ${error.message}\nStack: ${error.stack}` : '';
-    console.error(`ERROR: ${message}${errorDetails}`);
-=======
   private logs: string[] = [];
   private static instance: Logger;
   private isDevelopment: boolean;
@@ -76,8 +67,7 @@ class Logger {
 
   clear() {
     this.logs = [];
->>>>>>> 73b78a8 (Refactor logging across components: replace console logs with a centralized logger for improved error handling and debugging, enhance data processing feedback, and ensure consistent logging practices throughout the application.)
   }
 }
 
-export const logger = new Logger(); 
+export const logger = Logger.getInstance(); 

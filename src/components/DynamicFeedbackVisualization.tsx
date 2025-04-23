@@ -103,13 +103,9 @@ export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> 
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 pb-12 max-w-6xl mx-auto">
-<<<<<<< HEAD
-      <h1 className="text-2xl font-bold text-center mb-6">Análise de Feedback 360° Equipe DEV</h1>
-=======
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-center flex-grow">Análise de Feedback 360° Equipe DEV</h1>
       </div>
->>>>>>> 73b78a8 (Refactor logging across components: replace console logs with a centralized logger for improved error handling and debugging, enhance data processing feedback, and ensure consistent logging practices throughout the application.)
       
       <div className="border-b border-gray-200 mb-6">
         <nav className="-mb-px flex justify-center space-x-8">
