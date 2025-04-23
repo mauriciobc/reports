@@ -1,15 +1,6 @@
 import Papa from 'papaparse';
 import { logger } from './logger';
-
-export interface RadarData {
-  subject: string;
-  [key: string]: string | number; // For dynamic team member names
-}
-
-export interface BarData {
-  name: string;
-  value: number;
-}
+import { ChartData, RadarData, PieData, BarData, RadarDataPoint } from '../types';
 
 export interface PieData {
   name: string;
@@ -23,26 +14,35 @@ export interface ChartDataResponse {
   pie: PieData[];
 }
 
+interface StrengthEvaluation {
+  name: string;
+  needsImprovement: number;
+  asExpected: number;
+  exceeds: number;
+}
+
 const evaluationScores: { [key: string]: number } = {
-  // Pode melhorar variations
-  '❗ Pode melhorar: Precisa de ajustes.': 1,
-  'Pode melhorar: Precisa de ajustes.': 1,
+  // Precisa melhorar variations
+  'Precisa melhorar': 1,
   'Pode melhorar': 1,
   'Precisa de ajustes': 1,
-  'Precisa melhorar': 1,
+  'Abaixo do esperado': 1,
+  'Necessita melhorar': 1,
   
-  // Atende expectativas variations
-  '🆗 Como esperado. Atende às expectativas.': 2,
-  'Como esperado. Atende às expectativas.': 2,
+  // Atende às expectativas variations
   'Atende às expectativas': 2,
   'Como esperado': 2,
+  'Conforme esperado': 2,
   'Atende expectativas': 2,
+  'Dentro do esperado': 2,
+  'Adequado': 2,
   
-  // Supera expectativas variations
-  '🎉 Parabéns! Supera as expectativas.': 3,
-  'Parabéns! Supera as expectativas.': 3,
+  // Supera as expectativas variations
   'Supera as expectativas': 3,
   'Supera expectativas': 3,
+  'Excelente': 3,
+  'Excepcional': 3,
+  'Acima do esperado': 3,
   'Parabéns': 3,
   
   // Not applicable variations
@@ -64,263 +64,341 @@ const frequencyScores: { [key: string]: number } = {
 const normalizeEvaluationValue = (value: string): string => {
   if (!value) return '';
   
-  const cleanValue = value.trim();
-  
-  // Remove emojis and extra spaces
-  const withoutEmojis = cleanValue
-    .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  
-  const lowerValue = withoutEmojis.toLowerCase();
-  
-  // Try to match with known patterns
-  if (lowerValue.includes('pode melhorar') || lowerValue.includes('precisa')) {
-    return 'Pode melhorar';
+  const cleanValue = value.trim().toLowerCase();
+
+  // Handle N/A cases first
+  if (cleanValue === 'n/a' || cleanValue === 'na' || cleanValue === 'não se aplica') {
+    return '';
   }
-  if (lowerValue.includes('atende') || lowerValue.includes('como esperado')) {
-    return 'Atende às expectativas';
-  }
-  if (lowerValue.includes('supera') || lowerValue.includes('parabéns')) {
+
+  // Special handling for problem-solving related fields
+  if (cleanValue.includes('resolveu problemas complexos') || 
+      cleanValue.includes('criatividade e inovação na resolução') ||
+      cleanValue.includes('apoia os colegas na resolução') ||
+      cleanValue.includes('ajuda a resolver problemas') ||
+      cleanValue.includes('capacidade de resolução') ||
+      cleanValue.includes('inovação na resolução')) {
+    logger.log('Problem-solving field detected', { value: cleanValue });
     return 'Supera as expectativas';
   }
-  if (lowerValue.includes('não se aplica') || lowerValue === 'n/a' || lowerValue === 'na') {
-    return 'Não se aplica';
+
+  // Special handling for commitment-related fields
+  if (cleanValue.includes('dedicou tempo adicional') || 
+      cleanValue.includes('superou desafios') || 
+      cleanValue.includes('assumiu responsabilidades') ||
+      cleanValue.includes('dedicação, comprometimento') ||
+      cleanValue.includes('comprometimento e foco')) {
+    logger.log('Commitment field detected', { value: cleanValue });
+    return 'Supera as expectativas';
   }
   
-  return withoutEmojis;
-};
-
-const processRadarData = (data: any[]): RadarData[] => {
-  const competencies = [
-    { name: 'Cooperação', pattern: ['cooperação', 'coopera', 'ajuda mútua'] },
-    { name: 'Comunicação', pattern: ['comunicação', 'comunica'] },
-    { name: 'Comprometimento', pattern: ['compromisso', 'comprometimento'] },
-    { name: 'Domínio Técnico', pattern: ['domínio técnico', 'conhecimento técnico'] },
-    { name: 'Resolução Problemas', pattern: ['problemas', 'resolução', 'solução'] }
-  ];
-
-  logger.log('Starting radar data processing', {
-    dataRows: data.length,
-    competencies: competencies.map(c => ({ name: c.name, patterns: c.pattern }))
-  });
-
-  // Helper function to clean member name
-  const cleanMemberName = (name: string): string => {
-    return name.replace(/_1$/, '').trim();
+  // Enhanced mapping of responses with more specific patterns
+  const responseMap = {
+    'precisa melhorar': [
+      'precisa melhorar',
+      'precisa de ajustes',
+      'pode melhorar',
+      '❗ pode melhorar',
+      'necessita melhorar',
+      'abaixo do esperado',
+      'não atende',
+      'insatisfatório'
+    ],
+    'atende às expectativas': [
+      'como esperado',
+      'conforme esperado',
+      'atende expectativas',
+      'atende às expectativas',
+      '🆗 como esperado',
+      'dentro do esperado',
+      'adequado',
+      'satisfatório',
+      'bom'
+    ],
+    'supera as expectativas': [
+      'supera expectativas',
+      'supera as expectativas',
+      'excelente',
+      'excepcional',
+      'acima do esperado',
+      'parabéns',
+      '🎉 parabéns',
+      'muito bom',
+      'ótimo',
+      'excelente domínio',
+      'excelente comunicação'
+    ]
   };
 
-  // Helper function to check if a question matches a competency
-  const matchesCompetency = (questionText: string, patterns: string[]): boolean => {
-    const normalizedQuestion = questionText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return patterns.some(pattern => {
-      const normalizedPattern = pattern.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      return normalizedQuestion.includes(normalizedPattern);
-    });
-  };
-
-  // Helper function to extract member name from a column header
-  const extractMemberName = (header: string): string | null => {
-    if (!header.includes('>>')) return null;
-    
-    const parts = header.split('>>').map(part => part.trim());
-    if (parts.length < 2) return null;
-
-    const memberName = cleanMemberName(parts[1]);
-    if (!memberName || 
-        ['Data', 'Submission Date'].includes(memberName) || 
-        memberName.length === 0) {
-      return null;
+  // First try exact matches
+  for (const [normalized, variants] of Object.entries(responseMap)) {
+    if (variants.some(variant => cleanValue === variant || cleanValue.includes(variant))) {
+      const result = normalized === 'precisa melhorar' ? 'Precisa melhorar' :
+                    normalized === 'atende às expectativas' ? 'Atende às expectativas' :
+                    'Supera as expectativas';
+      logger.log('Normalized value found', { original: value, normalized: result });
+      return result;
     }
-
-    return memberName;
-  };
-
-  // Helper function to extract answer from column
-  const extractAnswer = (key: string, value: any): string | null => {
-    const parts = key.split('>>').map(part => part.trim());
-    
-    // First check if we have a value in the cell
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-    
-    // If we have a third part in the header (Question >> User >> Answer)
-    // AND the value is true/1/'1'/etc, then use the answer from the header
-    if (parts.length >= 3 && parts[2].trim()) {
-      const lastPart = parts[2].trim();
-      if (value === true || value === 1 || value === '1' || 
-          (typeof value === 'string' && value.toLowerCase() === 'true')) {
-        return lastPart;
-      }
-    }
-
-    return null;
-  };
-
-  // First, extract all unique member names from the column headers
-  const teamMembers = new Set<string>();
-  if (data.length > 0) {
-    Object.keys(data[0]).forEach(header => {
-      const memberName = extractMemberName(header);
-      if (memberName) {
-        teamMembers.add(memberName);
-        logger.log('Found team member', { 
-          memberName, 
-          originalHeader: header 
-        });
-      }
-    });
   }
 
-  const teamMembersArray = Array.from(teamMembers);
-  logger.log('Extracted team members', {
-    count: teamMembersArray.length,
-    members: teamMembersArray
+  // If no match found, log and return empty
+  logger.log('Unmatched evaluation value', {
+    originalValue: value,
+    cleanValue
   });
 
-  // Process data for each competency
-  return competencies.map(competency => {
-    const row: RadarData = { subject: competency.name };
-    
-    teamMembersArray.forEach(member => {
-      let totalScore = 0;
-      let count = 0;
-      let matchedQuestions: string[] = [];
-      let answers: { question: string, answer: string, score: number }[] = [];
-
-      // Process each row of data
-      data.forEach((dataRow, rowIndex) => {
-        // Find all columns for this member and competency
-        Object.entries(dataRow).forEach(([key, value]) => {
-          if (!key.includes('>>')) return;
-          
-          const parts = key.split('>>').map(part => part.trim());
-          if (parts.length < 2) return;
-
-          const questionText = parts[0];
-          const memberName = cleanMemberName(parts[1]);
-          
-          // Check if this column is relevant for our current member and competency
-          if (matchesCompetency(questionText, competency.pattern) && 
-              memberName === member) {
-            
-            logger.log('Found matching question', {
-              competency: competency.name,
-              patterns: competency.pattern,
-              question: questionText,
-              member: memberName,
-              key,
-              value
-            });
-
-            const answer = extractAnswer(key, value);
-            if (answer) {
-              const normalizedValue = normalizeEvaluationValue(answer);
-              matchedQuestions.push(questionText);
-              
-              logger.log('Processing answer', {
-                member,
-                competency: competency.name,
-                question: questionText,
-                answer,
-                normalizedValue,
-                hasScore: normalizedValue in evaluationScores,
-                originalValue: value,
-                headerParts: parts
-              });
-
-              if (normalizedValue in evaluationScores) {
-                const score = evaluationScores[normalizedValue];
-                totalScore += score;
-                count++;
-                answers.push({ question: questionText, answer: normalizedValue, score });
-
-                logger.log('Added score', {
-                  member,
-                  competency: competency.name,
-                  question: questionText,
-                  answer,
-                  normalizedValue,
-                  score,
-                  totalScore,
-                  count,
-                  answers
-                });
-              }
-            }
-          }
-        });
-      });
-
-      const averageScore = count > 0 ? totalScore / count : 0;
-      logger.log('Final score calculated', {
-        member,
-        competency: competency.name,
-        totalScore,
-        count,
-        averageScore,
-        matchedQuestions,
-        allAnswers: answers
-      });
-      
-      row[member] = averageScore;
-    });
-
-    return row;
-  });
+  return '';
 };
 
-const processBarData = (data: any[]): BarData[] => {
-  const strengthCategories = [
-    { name: 'Domínio técnico', pattern: 'Excelente domínio técnico da área' },
-    { name: 'Adaptabilidade', pattern: 'Facilidade de adaptação a mudanças e novas demandas' },
-    { name: 'Comprometimento', pattern: 'Dedicação, comprometimento e foco em resultados' },
-    { name: 'Resolução problemas', pattern: 'Criatividade e inovação na resolução de problemas' },
-    { name: 'Comunicação', pattern: 'Excelente comunicação e habilidade de apresentação' }
+// Helper function to determine field category
+const getFieldCategory = (field: string): string | null => {
+  const cleanField = field.toLowerCase().trim();
+  
+  if (cleanField.includes('resolução de problemas') || 
+      cleanField.includes('resolver problemas') ||
+      cleanField.includes('resolução problemas') ||
+      cleanField.includes('resolveu problemas') ||
+      cleanField.includes('capacidade de analisar problemas')) {
+    return 'Resolução Problemas';
+  }
+  
+  if (cleanField.includes('comunicação') ||
+      cleanField.includes('comunicar') ||
+      cleanField.includes('apresentação')) {
+    return 'Comunicação';
+  }
+  
+  if (cleanField.includes('cooperação') ||
+      cleanField.includes('cooperar') ||
+      cleanField.includes('ajuda mútua')) {
+    return 'Cooperação';
+  }
+  
+  if (cleanField.includes('comprometimento') ||
+      cleanField.includes('dedicação') ||
+      cleanField.includes('foco em resultados')) {
+    return 'Comprometimento';
+  }
+  
+  if (cleanField.includes('domínio técnico') ||
+      cleanField.includes('conhecimento técnico') ||
+      cleanField.includes('expertise técnica')) {
+    return 'Domínio Técnico';
+  }
+  
+  return null;
+};
+
+export function processRadarData(data: any[]): RadarData {
+  const competencies = [
+    'Cooperação',
+    'Comunicação',
+    'Comprometimento',
+    'Domínio Técnico',
+    'Resolução Problemas'
   ];
 
-  return strengthCategories.map(category => {
-    let totalCount = 0;
-    let matchingKeys: string[] = [];
+  // First, group evaluations by collaborator
+  const collaboratorEvaluations: { [key: string]: { [key: string]: { total: number; count: number } } } = {};
 
-    data.forEach(row => {
+  // Process each row of data
+  data.forEach(row => {
+    // Log the row being processed
+    logger.log('Processing row for radar data', { row });
+
+    // Process each field in the row
+    Object.entries(row).forEach(([field, value]) => {
+      if (typeof value !== 'string') return;
+
+      // Extract collaborator name from the field (format: "Question >> Name >> Evaluation")
+      const parts = field.split('>>').map(part => part.trim());
+      if (parts.length < 2) return;
+      
+      const collaboratorName = parts[1];
+      
+      // Use getFieldCategory to determine the competency
+      const matchingCompetency = getFieldCategory(field);
+
+      if (matchingCompetency && competencies.includes(matchingCompetency)) {
+        // Initialize collaborator data if not exists
+        if (!collaboratorEvaluations[collaboratorName]) {
+          collaboratorEvaluations[collaboratorName] = {};
+          competencies.forEach(comp => {
+            collaboratorEvaluations[collaboratorName][comp] = { total: 0, count: 0 };
+          });
+        }
+
+        // Get the normalized evaluation value
+        const normalizedValue = normalizeEvaluationValue(value);
+        
+        logger.log('Processing competency field', {
+          field,
+          value,
+          collaborator: collaboratorName,
+          matchingCompetency,
+          normalizedValue
+        });
+
+        // Map normalized values to scores
+        let score = 0;
+        switch (normalizedValue) {
+          case 'Precisa melhorar':
+            score = 1;
+            break;
+          case 'Atende às expectativas':
+            score = 2;
+            break;
+          case 'Supera as expectativas':
+            score = 3;
+            break;
+          default:
+            return;
+        }
+
+        // Update the totals and counts
+        collaboratorEvaluations[collaboratorName][matchingCompetency].total += score;
+        collaboratorEvaluations[collaboratorName][matchingCompetency].count++;
+
+        logger.log('Updated collaborator score', {
+          collaborator: collaboratorName,
+          competency: matchingCompetency,
+          score,
+          newTotal: collaboratorEvaluations[collaboratorName][matchingCompetency].total,
+          newCount: collaboratorEvaluations[collaboratorName][matchingCompetency].count
+        });
+      }
+    });
+  });
+
+  // Convert the grouped data into the final format
+  const radarData = competencies.map(competency => {
+    const dataPoint = {
+      competency,
+      collaborators: {} as { [key: string]: number }
+    };
+
+    // Calculate average for each collaborator
+    Object.entries(collaboratorEvaluations).forEach(([collaborator, evaluations]) => {
+      const { total, count } = evaluations[competency];
+      dataPoint.collaborators[collaborator] = count > 0 ? Number((total / count).toFixed(2)) : 0;
+    });
+
+    logger.log('Calculated competency data point', {
+      competency,
+      collaboratorScores: dataPoint.collaborators
+    });
+
+    return dataPoint;
+  });
+
+  logger.log('Final radar data', { data: radarData });
+
+  return { data: radarData };
+}
+
+const processBarData = (data: any[]): StrengthEvaluation[] => {
+  const strengthCategories = [
+    { name: 'Domínio técnico', pattern: 'domínio técnico' },
+    { name: 'Adaptabilidade', pattern: 'adaptação' },
+    { name: 'Comprometimento', pattern: 'comprometimento' },
+    { name: 'Resolução problemas', pattern: 'resolução de problemas' },
+    { name: 'Comunicação', pattern: 'comunicação' }
+  ];
+
+  // Initialize results structure
+  const results = strengthCategories.map(category => ({
+    name: category.name,
+    needsImprovement: 0,
+    asExpected: 0,
+    exceeds: 0
+  }));
+
+  logger.log('Starting bar data processing', {
+    totalRows: data.length,
+    categories: strengthCategories
+  });
+
+  // Process each row of data
+  data.forEach((row, rowIndex) => {
+    logger.log(`Processing row ${rowIndex}`, {
+      keys: Object.keys(row)
+    });
+
+    strengthCategories.forEach((category, index) => {
+      // Look for evaluation fields for this category
       Object.entries(row).forEach(([key, value]) => {
-        // Check if the key contains the question pattern
-        if (key.toLowerCase().includes('pontos fortes') && 
-            key.toLowerCase().includes(category.pattern.toLowerCase())) {
-          matchingKeys.push(key);
+        const keyLower = key.toLowerCase();
+        const patternLower = category.pattern.toLowerCase();
+        
+        // Log all fields for analysis
+        logger.log('Analyzing field', {
+          key,
+          value,
+          category: category.name,
+          includesPattern: keyLower.includes(patternLower)
+        });
+
+        if (typeof key === 'string' && keyLower.includes(patternLower)) {
+          // Skip empty or N/A responses
+          if (!value || value === 'N/A' || value === '') {
+            logger.log('Skipping empty/NA value', { key, value });
+            return;
+          }
+
+          // Normalize the evaluation value
+          const evaluation = normalizeEvaluationValue(value);
           
-          // Log the key and value for debugging
-          console.log(`Found matching key for ${category.name}:`, key);
-          console.log('Value:', value);
-          
-          // Check various truthy values
-          if (value === true || 
-              value === 1 || 
-              value === '1' || 
-              value === 'true' || 
-              value === 'yes' || 
-              value === 'sim' ||
-              value === category.pattern ||
-              (typeof value === 'string' && value.toLowerCase().includes('sim'))) {
-            totalCount++;
-            console.log(`Incrementing count for ${category.name}`);
+          // Log the evaluation process
+          logger.log('Processing evaluation', {
+            key,
+            originalValue: value,
+            normalizedValue: evaluation,
+            category: category.name
+          });
+
+          // Only process if we got a valid normalized value
+          if (evaluation) {
+            // Update the appropriate counter
+            switch (evaluation) {
+              case 'Precisa melhorar':
+                results[index].needsImprovement++;
+                logger.log('Incremented needs improvement', {
+                  category: category.name,
+                  total: results[index].needsImprovement
+                });
+                break;
+              case 'Atende às expectativas':
+                results[index].asExpected++;
+                logger.log('Incremented as expected', {
+                  category: category.name,
+                  total: results[index].asExpected
+                });
+                break;
+              case 'Supera as expectativas':
+                results[index].exceeds++;
+                logger.log('Incremented exceeds', {
+                  category: category.name,
+                  total: results[index].exceeds
+                });
+                break;
+            }
+          } else {
+            logger.log('Skipping unrecognized evaluation', {
+              originalValue: value,
+              key,
+              category: category.name
+            });
           }
         }
       });
     });
-
-    console.log(`Category ${category.name}:`, {
-      matchingKeys,
-      totalCount
-    });
-
-    return {
-      name: category.name,
-      value: totalCount
-    };
   });
+
+  logger.log('Bar data processing complete', {
+    results
+  });
+
+  return results;
 };
 
 const processPieData = (data: any[]): PieData[] => {
@@ -330,18 +408,44 @@ const processPieData = (data: any[]): PieData[] => {
     'Precisa melhorar': { count: 0, color: '#FFC107' }      // Yellow
   };
 
-  data.forEach((row) => {
+  logger.log('Starting pie data processing', { totalRows: data.length });
+
+  data.forEach((row, rowIndex) => {
     Object.entries(row).forEach(([key, value]) => {
       if (typeof value === 'string') {
         const normalizedValue = normalizeEvaluationValue(value);
+        
+        logger.log('Processing pie data value', {
+          rowIndex,
+          key,
+          originalValue: value,
+          normalizedValue
+        });
 
-        // Map normalized values to rating categories, excluding 'Não se aplica'
-        if (normalizedValue === 'Supera as expectativas') {
-          ratings['Supera expectativas'].count++;
-        } else if (normalizedValue === 'Atende às expectativas') {
-          ratings['Atende expectativas'].count++;
-        } else if (normalizedValue === 'Pode melhorar') {
-          ratings['Precisa melhorar'].count++;
+        // Map normalized values to rating categories
+        switch (normalizedValue) {
+          case 'Supera as expectativas':
+            ratings['Supera expectativas'].count++;
+            logger.log('Incremented Supera expectativas count', {
+              newCount: ratings['Supera expectativas'].count
+            });
+            break;
+          case 'Atende às expectativas':
+            ratings['Atende expectativas'].count++;
+            logger.log('Incremented Atende expectativas count', {
+              newCount: ratings['Atende expectativas'].count
+            });
+            break;
+          case 'Precisa melhorar':
+            ratings['Precisa melhorar'].count++;
+            logger.log('Incremented Precisa melhorar count', {
+              newCount: ratings['Precisa melhorar'].count
+            });
+            break;
+          default:
+            // Skip empty or unrecognized values
+            logger.log('Skipping unrecognized value', { normalizedValue });
+            break;
         }
       }
     });
@@ -349,6 +453,12 @@ const processPieData = (data: any[]): PieData[] => {
 
   // Convert to array format and calculate percentages
   const total = Object.values(ratings).reduce((sum, { count }) => sum + count, 0);
+  
+  logger.log('Pie data processing complete', {
+    ratings,
+    total
+  });
+
   return Object.entries(ratings).map(([name, data]) => ({
     name,
     value: total > 0 ? (data.count / total) * 100 : 0,
