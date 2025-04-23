@@ -139,8 +139,9 @@ const CustomBarTooltip: React.FC<TooltipProps> = ({ active, payload, label }) =>
 export const DynamicFeedbackVisualization: React.FC<FeedbackVisualizationProps> = ({ data }) => {
   const [activeTab, setActiveTab] = useState('competencies');
   const [focusedMember, setFocusedMember] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState('name');
+  const [sortBy, setSortBy] = useState('exceeds');
   const [showPercentages, setShowPercentages] = useState(false);
+  const [highlightedMembers, setHighlightedMembers] = useState<Set<string>>(new Set());
 
   // Log component data on mount and updates
   useEffect(() => {

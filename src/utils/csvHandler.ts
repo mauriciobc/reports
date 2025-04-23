@@ -92,7 +92,6 @@ const normalizeEvaluationValue = (value: string): string => {
     return 'Supera as expectativas';
   }
   
-<<<<<<< HEAD
   // Enhanced mapping of responses with more specific patterns
   const responseMap = {
     'precisa melhorar': [
@@ -155,38 +154,51 @@ const normalizeEvaluationValue = (value: string): string => {
 const getFieldCategory = (field: string): string | null => {
   const cleanField = field.toLowerCase().trim();
   
+  // Log the field being categorized
+  logger.log('Categorizing field', { field: cleanField });
+  
   if (cleanField.includes('resolução de problemas') || 
       cleanField.includes('resolver problemas') ||
       cleanField.includes('resolução problemas') ||
       cleanField.includes('resolveu problemas') ||
       cleanField.includes('capacidade de analisar problemas')) {
+    logger.log('Field categorized as Resolução Problemas', { field });
     return 'Resolução Problemas';
   }
   
   if (cleanField.includes('comunicação') ||
       cleanField.includes('comunicar') ||
-      cleanField.includes('apresentação')) {
+      cleanField.includes('apresentação') ||
+      cleanField.includes('clareza') ||
+      cleanField.includes('objetividade') ||
+      cleanField.includes('mensagens') ||
+      cleanField.includes('compreendidas')) {
+    logger.log('Field categorized as Comunicação', { field });
     return 'Comunicação';
   }
   
   if (cleanField.includes('cooperação') ||
       cleanField.includes('cooperar') ||
       cleanField.includes('ajuda mútua')) {
+    logger.log('Field categorized as Cooperação', { field });
     return 'Cooperação';
   }
   
   if (cleanField.includes('comprometimento') ||
       cleanField.includes('dedicação') ||
       cleanField.includes('foco em resultados')) {
+    logger.log('Field categorized as Comprometimento', { field });
     return 'Comprometimento';
   }
   
   if (cleanField.includes('domínio técnico') ||
       cleanField.includes('conhecimento técnico') ||
       cleanField.includes('expertise técnica')) {
+    logger.log('Field categorized as Domínio Técnico', { field });
     return 'Domínio Técnico';
   }
   
+  logger.log('Field not categorized', { field });
   return null;
 };
 
@@ -258,6 +270,17 @@ export function processRadarData(data: any[]): RadarData {
           matchingCompetency,
           normalizedValue
         });
+
+        // Skip 'Não se aplica' responses
+        if (normalizedValue === 'Não se aplica') {
+          logger.log('Skipping não se aplica response', {
+            field,
+            value,
+            normalizedName,
+            matchingCompetency
+          });
+          return;
+        }
 
         // Map normalized values to scores
         let score = 0;
@@ -453,198 +476,6 @@ const processBarData = (data: any[]): StrengthEvaluation[] => {
 
   return results;
 };
-=======
-  return withoutEmojis;
-};
-
-// Helper function to determine field category
-const getFieldCategory = (field: string): string | null => {
-  const cleanField = field.toLowerCase().trim();
-  
-  if (cleanField.includes('resolução de problemas') || 
-      cleanField.includes('resolver problemas') ||
-      cleanField.includes('resolução problemas') ||
-      cleanField.includes('resolveu problemas') ||
-      cleanField.includes('capacidade de analisar problemas')) {
-    return 'Resolução Problemas';
-  }
-  
-  if (cleanField.includes('comunicação') ||
-      cleanField.includes('comunicar') ||
-      cleanField.includes('apresentação')) {
-    return 'Comunicação';
-  }
-  
-  if (cleanField.includes('cooperação') ||
-      cleanField.includes('cooperar') ||
-      cleanField.includes('ajuda mútua')) {
-    return 'Cooperação';
-  }
-  
-  if (cleanField.includes('comprometimento') ||
-      cleanField.includes('dedicação') ||
-      cleanField.includes('foco em resultados')) {
-    return 'Comprometimento';
-  }
-  
-  if (cleanField.includes('domínio técnico') ||
-      cleanField.includes('conhecimento técnico') ||
-      cleanField.includes('expertise técnica')) {
-    return 'Domínio Técnico';
-  }
-  
-  return null;
-};
-
-// Helper function to normalize collaborator names
-const normalizeCollaboratorName = (name: string): string => {
-  return name
-    .split('_')[0]  // Remove _1, _2, etc. suffixes
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // Remove accents
-    .trim();  // Remove extra spaces
-};
-
-export function processRadarData(data: any[]): RadarData[] {
-  const competencies = [
-    { name: 'Cooperação', pattern: ['cooperação', 'coopera', 'ajuda mútua'] },
-    { name: 'Comunicação', pattern: ['comunicação', 'comunica'] },
-    { name: 'Comprometimento', pattern: ['compromisso', 'comprometimento'] },
-    { name: 'Domínio Técnico', pattern: ['domínio técnico', 'conhecimento técnico'] },
-    { name: 'Resolução Problemas', pattern: ['problemas', 'resolução', 'solução'] }
-  ];
-
-  logger.log('Starting radar data processing', {
-    dataRows: data.length,
-    competencies: competencies.map(c => ({ name: c.name, patterns: c.pattern }))
-  });
-
-  // First, group evaluations by collaborator
-  const collaboratorEvaluations: { [key: string]: { [key: string]: { total: number; count: number } } } = {};
-  const allCollaborators = new Set<string>();
-  const nameMapping: { [key: string]: string } = {};  // Map normalized names to original names
-
-  // Helper function to clean member name
-  const cleanMemberName = (name: string): string => {
-    return name.replace(/_1$/, '').trim();
-  };
-
-  // Helper function to check if a question matches a competency
-  const matchesCompetency = (questionText: string, patterns: string[]): boolean => {
-    const normalizedQuestion = questionText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return patterns.some(pattern => {
-      const normalizedPattern = pattern.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      return normalizedQuestion.includes(normalizedPattern);
-    });
-  };
-
-  // Process each row of data
-  data.forEach((row: any, rowIndex: number) => {
-    Object.entries(row).forEach(([field, value]) => {
-      // Extract collaborator name from the field (format: "Question >> Name >> Evaluation")
-      const parts = field.split('>>').map(part => part.trim());
-      if (parts.length < 2) return;
-
-      const question = parts[0];
-      const collaborator = parts[1];
-      const normalizedName = normalizeCollaboratorName(collaborator);
-
-      // Skip if this is not a valid evaluation field
-      if (!question || !collaborator || collaborator === 'Data' || collaborator === 'Submission Date') {
-        return;
-      }
-
-      // Store the original name mapping
-      nameMapping[normalizedName] = collaborator;
-
-      // Initialize collaborator's evaluations object if it doesn't exist
-      if (!collaboratorEvaluations[normalizedName]) {
-        collaboratorEvaluations[normalizedName] = {};
-        competencies.forEach(comp => {
-          collaboratorEvaluations[normalizedName][comp.name] = { total: 0, count: 0 };
-        });
-      }
-
-      // Add collaborator to the set of all collaborators
-      allCollaborators.add(normalizedName);
-
-      // Find matching competency for this question
-      competencies.forEach(comp => {
-        if (matchesCompetency(question, comp.pattern)) {
-          const normalizedValue = normalizeEvaluationValue(value as string);
-          const score = evaluationScores[normalizedValue] || 0;
-
-          if (score > 0) {  // Only count valid evaluations
-            collaboratorEvaluations[normalizedName][comp.name].total += score;
-            collaboratorEvaluations[normalizedName][comp.name].count++;
-          }
-        }
-      });
-    });
-  });
-
-  // Convert the grouped data into the radar chart format
-  const radarData: RadarData[] = competencies.map(comp => {
-    const dataPoint: RadarData = { subject: comp.name };
-    
-    allCollaborators.forEach(collaborator => {
-      const evaluations = collaboratorEvaluations[collaborator][comp.name];
-      const average = evaluations.count > 0 
-        ? evaluations.total / evaluations.count 
-        : 0;
-      
-      dataPoint[nameMapping[collaborator] || collaborator] = Number(average.toFixed(2));
-    });
-    
-    return dataPoint;
-  });
-
-  logger.log('Radar data processing completed', {
-    processedCollaborators: Array.from(allCollaborators),
-    competenciesProcessed: competencies.map(c => c.name),
-    resultDataPoints: radarData.length
-  });
-
-  return radarData;
-}
-
-export function processBarData(data: any[]): BarData[] {
-  const strengthCategories = [
-    { name: 'Domínio técnico', pattern: 'Excelente domínio técnico da área' },
-    { name: 'Comunicação', pattern: 'Comunicação clara e efetiva' },
-    { name: 'Trabalho em equipe', pattern: 'Trabalho em equipe e colaboração' },
-    { name: 'Resolução de problemas', pattern: 'Capacidade de resolver problemas' },
-    { name: 'Proatividade', pattern: 'Proatividade e iniciativa' },
-    { name: 'Organização', pattern: 'Organização e gestão do tempo' },
-    { name: 'Liderança', pattern: 'Habilidades de liderança' },
-    { name: 'Adaptabilidade', pattern: 'Adaptabilidade e flexibilidade' },
-    { name: 'Inovação', pattern: 'Pensamento inovador' },
-    { name: 'Comprometimento', pattern: 'Comprometimento com resultados' }
-  ];
-
-  const strengthCounts: { [key: string]: number } = {};
-  strengthCategories.forEach(category => {
-    strengthCounts[category.name] = 0;
-  });
->>>>>>> origin/main
-
-  // Count occurrences of each strength
-  data.forEach(row => {
-    Object.entries(row).forEach(([key, value]) => {
-      if (typeof value === 'string' && value.trim()) {
-        strengthCategories.forEach(category => {
-          if (value.toLowerCase().includes(category.pattern.toLowerCase())) {
-            strengthCounts[category.name]++;
-          }
-        });
-      }
-    });
-  });
-
-  // Convert to array and sort by count
-  return Object.entries(strengthCounts)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
-}
 
 export function processPieData(data: any[]): PieData[] {
   const totalEvaluations = { total: 0 };
@@ -654,7 +485,6 @@ export function processPieData(data: any[]): PieData[] {
     'Supera as expectativas': 0
   };
 
-<<<<<<< HEAD
   logger.log('Starting pie data processing', { totalRows: data.length });
 
   data.forEach((row, rowIndex) => {
@@ -672,57 +502,52 @@ export function processPieData(data: any[]): PieData[] {
         // Map normalized values to rating categories
         switch (normalizedValue) {
           case 'Supera as expectativas':
-            ratings['Supera expectativas'].count++;
-            logger.log('Incremented Supera expectativas count', {
-              newCount: ratings['Supera expectativas'].count
-            });
+            evaluationCounts['Supera as expectativas']++;
+            totalEvaluations.total++;
             break;
           case 'Atende às expectativas':
-            ratings['Atende expectativas'].count++;
-            logger.log('Incremented Atende expectativas count', {
-              newCount: ratings['Atende expectativas'].count
-            });
+            evaluationCounts['Atende às expectativas']++;
+            totalEvaluations.total++;
             break;
           case 'Precisa melhorar':
-            ratings['Precisa melhorar'].count++;
-            logger.log('Incremented Precisa melhorar count', {
-              newCount: ratings['Precisa melhorar'].count
-            });
+            evaluationCounts['Precisa melhorar']++;
+            totalEvaluations.total++;
             break;
           default:
             // Skip empty or unrecognized values
             logger.log('Skipping unrecognized value', { normalizedValue });
             break;
-=======
-  // Count occurrences of each evaluation type
-  data.forEach(row => {
-    Object.values(row).forEach(value => {
-      if (typeof value === 'string') {
-        const normalizedValue = normalizeEvaluationValue(value);
-        if (normalizedValue in evaluationCounts) {
-          evaluationCounts[normalizedValue]++;
-          totalEvaluations.total++;
->>>>>>> origin/main
         }
       }
     });
   });
 
-<<<<<<< HEAD
   // Convert to array format and calculate percentages
-  const total = Object.values(ratings).reduce((sum, { count }) => sum + count, 0);
+  const total = Object.values(evaluationCounts).reduce((sum, count) => sum + count, 0);
   
   logger.log('Pie data processing complete', {
-    ratings,
+    evaluationCounts,
     total
   });
 
-  return Object.entries(ratings).map(([name, data]) => ({
-    name,
-    value: total > 0 ? (data.count / total) * 100 : 0,
-    color: data.color
-  }));
-};
+  return [
+    {
+      name: 'Pode melhorar',
+      value: (evaluationCounts['Pode melhorar'] / totalEvaluations.total) * 100,
+      color: '#ff6b6b'
+    },
+    {
+      name: 'Atende às expectativas',
+      value: (evaluationCounts['Atende às expectativas'] / totalEvaluations.total) * 100,
+      color: '#4ecdc4'
+    },
+    {
+      name: 'Supera as expectativas',
+      value: (evaluationCounts['Supera as expectativas'] / totalEvaluations.total) * 100,
+      color: '#45b7d1'
+    }
+  ];
+}
 
 export const parseCsvFile = async (file: File): Promise<any[]> => {
   return new Promise((resolve, reject) => {
@@ -769,27 +594,18 @@ export const processChartData = async (files: File[]): Promise<ChartDataResponse
       logger.log('Processing file:', { fileName: file.name });
       const parsedData = await parseCsvFile(file);
       allData.push(...parsedData);
-=======
-  // Convert counts to percentages and assign colors
-  return [
-    {
-      name: 'Pode melhorar',
-      value: (evaluationCounts['Pode melhorar'] / totalEvaluations.total) * 100,
-      color: '#ff6b6b'
-    },
-    {
-      name: 'Atende às expectativas',
-      value: (evaluationCounts['Atende às expectativas'] / totalEvaluations.total) * 100,
-      color: '#4ecdc4'
-    },
-    {
-      name: 'Supera as expectativas',
-      value: (evaluationCounts['Supera as expectativas'] / totalEvaluations.total) * 100,
-      color: '#45b7d1'
->>>>>>> origin/main
     }
-  ];
-}
+
+    return {
+      radar: processRadarData(allData),
+      bar: processBarData(allData),
+      pie: processPieData(allData)
+    };
+  } catch (error) {
+    logger.error('Error processing CSV files:', error);
+    throw error;
+  }
+};
 
 export function processCSVData(csvContent: string): ChartDataResponse {
   const parsedData = Papa.parse(csvContent, {
